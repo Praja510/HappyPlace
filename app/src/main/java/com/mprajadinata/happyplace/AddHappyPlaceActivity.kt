@@ -1,14 +1,19 @@
 package com.mprajadinata.happyplace
 
+import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.DatePickerDialog
 import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
 import android.provider.Settings
+import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -18,7 +23,10 @@ import com.karumi.dexter.PermissionToken
 import com.karumi.dexter.listener.PermissionRequest
 import com.karumi.dexter.listener.multi.MultiplePermissionsListener
 import kotlinx.android.synthetic.main.activity_add_happy_place.*
+import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
+import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -27,10 +35,14 @@ class AddHappyPlaceActivity : AppCompatActivity(), View.OnClickListener {
 
     private lateinit var dateSetListener: DatePickerDialog.OnDateSetListener
     private var cal = Calendar.getInstance()
+    private var saveImageToInternalStorage: Uri? = null
+    private var mLatitude: Double = 0.0
+    private var mLongitude: Double = 0.0
 
     companion object {
         private const val GALLERY = 1
         private const val CAMERA = 2
+        private const val IMAGE_DIRECTORY = "HappyPlacesImages"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -74,11 +86,7 @@ class AddHappyPlaceActivity : AppCompatActivity(), View.OnClickListener {
                 pictureDialog.setItems(pictureDialogItems) { dialog, which ->
                     when (which) {
                         0 -> choosePhotoFromGallery()
-                        1 -> Toast.makeText(
-                            this,
-                            "Camera selection coming soon..",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        1 -> takePhotoFromCamera()
                     }
                 }
                 pictureDialog.show()
@@ -86,20 +94,53 @@ class AddHappyPlaceActivity : AppCompatActivity(), View.OnClickListener {
         }
     }
 
+    private fun takePhotoFromCamera() {
+        Dexter.withActivity(this).withPermissions(
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            Manifest.permission.CAMERA
+        )
+            .withListener(object : MultiplePermissionsListener {
+                override fun onPermissionsChecked(p0: MultiplePermissionsReport) {
+
+                    if (p0.areAllPermissionsGranted()) {
+                        val galleryIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+                        startActivityForResult(galleryIntent, CAMERA)
+                    }
+                }
+
+                override fun onPermissionRationaleShouldBeShown(
+                    p0: MutableList<PermissionRequest>,
+                    p1: PermissionToken
+                ) {
+                    showRationalDialogForPermission()
+                }
+            }).onSameThread().check()
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode == Activity.RESULT_OK) {
-            if (data != null) {
-                val contentUri = data.data
-                try {
-                    val selectedImageBitmap =
-                        MediaStore.Images.Media.getBitmap(this.contentResolver, contentUri)
-                    iv_place_image.setImageBitmap(selectedImageBitmap)
-                } catch (e: IOException) {
-                    e.printStackTrace()
-                    Toast.makeText(this, "Failed to load the image from", Toast.LENGTH_SHORT).show()
-
+            if (requestCode == GALLERY) {
+                if (data != null) {
+                    val contentUri = data.data
+                    try {
+                        val selectedImageBitmap =
+                            MediaStore.Images.Media.getBitmap(this.contentResolver, contentUri)
+                        saveImageToInternalStorage = saveImageToInternalStorage(selectedImageBitmap)
+                        Log.e("Save Image: ", "path :: $saveImageToInternalStorage")
+                        iv_place_image.setImageBitmap(selectedImageBitmap)
+                    } catch (e: IOException) {
+                        e.printStackTrace()
+                        Toast.makeText(this, "Failed to load the image from", Toast.LENGTH_SHORT)
+                            .show()
+                    }
                 }
+            } else if (requestCode == CAMERA) {
+                val thumbnail: Bitmap = data!!.extras!!.get("data") as Bitmap
+                saveImageToInternalStorage = saveImageToInternalStorage(thumbnail)
+                Log.e("Save image: ", "path :: $saveImageToInternalStorage")
+                iv_place_image.setImageBitmap(thumbnail)
             }
         }
     }
@@ -157,5 +198,22 @@ class AddHappyPlaceActivity : AppCompatActivity(), View.OnClickListener {
         val myFormat = "dd.MM.yyyy"
         val sdf = SimpleDateFormat(myFormat, Locale.getDefault())
         et_date.setText(sdf.format(cal.time).toString())
+    }
+
+    private fun saveImageToInternalStorage(bitmap: Bitmap): Uri {
+        val wrapper = ContextWrapper(applicationContext)
+        var file = wrapper.getDir(IMAGE_DIRECTORY, Context.MODE_PRIVATE)
+        file = File(file, "${UUID.randomUUID()}.jpg")
+
+        try {
+            val stream: OutputStream = FileOutputStream(file)
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, stream)
+            stream.flush()
+            stream.close()
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+
+        return Uri.parse(file.absolutePath)
     }
 }
