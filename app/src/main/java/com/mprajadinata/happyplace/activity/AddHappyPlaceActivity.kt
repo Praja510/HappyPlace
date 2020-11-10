@@ -1,4 +1,4 @@
-package com.mprajadinata.happyplace
+package com.mprajadinata.happyplace.activity
 
 import android.Manifest
 import android.app.Activity
@@ -22,6 +22,8 @@ import com.karumi.dexter.MultiplePermissionsReport
 import com.karumi.dexter.PermissionToken
 import com.karumi.dexter.listener.PermissionRequest
 import com.karumi.dexter.listener.multi.MultiplePermissionsListener
+import com.mprajadinata.happyplace.MainActivity
+import com.mprajadinata.happyplace.R
 import com.mprajadinata.happyplace.database.DatabaseHandler
 import com.mprajadinata.happyplace.model.HappyPlaceModel
 import kotlinx.android.synthetic.main.activity_add_happy_place.*
@@ -40,6 +42,7 @@ class AddHappyPlaceActivity : AppCompatActivity(), View.OnClickListener {
     private var saveImageToInternalStorage: Uri? = null
     private var mLatitude: Double = 0.0
     private var mLongitude: Double = 0.0
+    private var mHappyPlaceDetails: HappyPlaceModel? = null
 
     companion object {
         private const val GALLERY = 1
@@ -51,12 +54,29 @@ class AddHappyPlaceActivity : AppCompatActivity(), View.OnClickListener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_add_happy_place)
 
+        supportActionBar?.setTitle("Edit happy places")
 
-
+        mHappyPlaceDetails = intent.getParcelableExtra(MainActivity.EXTRA_PLACE_DETAIL)
         setSupportActionBar(toolbar_add_place)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         toolbar_add_place.setNavigationOnClickListener {
             onBackPressed()
+
+        }
+
+        mHappyPlaceDetails.let {
+            if (it != null) {
+                saveImageToInternalStorage = Uri.parse(mHappyPlaceDetails!!.image)
+                iv_place_image.setImageURI(saveImageToInternalStorage)
+                et_title.setText(it!!.title)
+                et_description.setText(it!!.description)
+                et_date.setText(it!!.date)
+                et_location.setText(it!!.location)
+                mLatitude = it.latitude
+                mLongitude = it.longitude
+
+                btn_save.text = "UPDATE"
+            }
         }
 
         dateSetListener =
@@ -117,9 +137,8 @@ class AddHappyPlaceActivity : AppCompatActivity(), View.OnClickListener {
 
                     }
                     else -> {
-
                         val happyPlaceModel = HappyPlaceModel(
-                            0,
+                            if (mHappyPlaceDetails == null) 0 else mHappyPlaceDetails!!.id,
                             et_title.text.toString(),
                             saveImageToInternalStorage.toString(),
                             et_description.text.toString(),
@@ -130,10 +149,19 @@ class AddHappyPlaceActivity : AppCompatActivity(), View.OnClickListener {
                         )
 
                         val dbHandler = DatabaseHandler(this)
-                        val addHappyPlace = dbHandler.addHappyPlace(happyPlaceModel)
-                        if (addHappyPlace > 0) {
-                            setResult(Activity.RESULT_OK)
-                            finish();
+                        if (mHappyPlaceDetails == null) {
+                            val addHappyPlace = dbHandler.addHappyPlace(happyPlaceModel)
+                            if (addHappyPlace > 0) {
+                                setResult(Activity.RESULT_OK)
+                                finish()
+
+                            }
+                        } else {
+                            val updateHappyPlace = dbHandler.updateHappyPlace(happyPlaceModel)
+                            if (updateHappyPlace > 0) {
+                                setResult(Activity.RESULT_OK)
+                                finish()
+                            }
                         }
                     }
                 }
@@ -152,7 +180,10 @@ class AddHappyPlaceActivity : AppCompatActivity(), View.OnClickListener {
 
                     if (p0.areAllPermissionsGranted()) {
                         val galleryIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-                        startActivityForResult(galleryIntent, CAMERA)
+                        startActivityForResult(
+                            galleryIntent,
+                            CAMERA
+                        )
                     }
                 }
 
@@ -206,7 +237,10 @@ class AddHappyPlaceActivity : AppCompatActivity(), View.OnClickListener {
 
                         val galleryIntent =
                             Intent(Intent.ACTION_PICK, MediaStore.Images.Media.INTERNAL_CONTENT_URI)
-                        startActivityForResult(galleryIntent, GALLERY)
+                        startActivityForResult(
+                            galleryIntent,
+                            GALLERY
+                        )
                     }
                 }
 

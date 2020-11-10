@@ -2,12 +2,17 @@ package com.mprajadinata.happyplace
 
 import android.app.Activity
 import android.content.Intent
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.mprajadinata.happyplace.activity.AddHappyPlaceActivity
+import com.mprajadinata.happyplace.activity.HappyDetailActivity
 import com.mprajadinata.happyplace.adapter.HappyPlaceAdapter
+import com.mprajadinata.happyplace.callback.SwipeToEditCallback
 import com.mprajadinata.happyplace.database.DatabaseHandler
 import com.mprajadinata.happyplace.model.HappyPlaceModel
 import kotlinx.android.synthetic.main.activity_main.*
@@ -47,6 +52,33 @@ class MainActivity : AppCompatActivity() {
         rv_happy_places_list.setHasFixedSize(true)
         val placesAdapter = HappyPlaceAdapter(this, happyPlaceList)
         rv_happy_places_list.adapter = placesAdapter
+
+        placesAdapter.setOnClickListener(object : HappyPlaceAdapter.OnClickListener {
+            override fun onClick(position: Int, model: HappyPlaceModel) {
+                val intent = Intent(this@MainActivity, HappyDetailActivity::class.java)
+                intent.putExtra(EXTRA_PLACE_DETAIL, model)
+
+                startActivity(intent)
+
+            }
+        })
+
+        val editSwipeHandler = object : SwipeToEditCallback(this) {
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+
+                val adapter = rv_happy_places_list.adapter as HappyPlaceAdapter
+                adapter.notifyEditItem(
+                    this@MainActivity,
+                    viewHolder.adapterPosition,
+                    ADD_PLACE_ACTIVITY_REQUEST_CODE
+                )
+            }
+        }
+
+        val editItemTouchHelper = ItemTouchHelper(editSwipeHandler)
+        editItemTouchHelper.attachToRecyclerView(rv_happy_places_list)
+
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -64,5 +96,8 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val ADD_PLACE_ACTIVITY_REQUEST_CODE = 1
+        const val EXTRA_PLACE_DETAIL = "extra_place_detail"
     }
+
+
 }
