@@ -1,6 +1,7 @@
 package com.mprajadinata.happyplace.activity
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.DatePickerDialog
@@ -9,15 +10,18 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.graphics.Bitmap
+import android.location.Location
 import android.location.LocationManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Looper
 import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.gms.location.*
 import com.google.android.libraries.places.api.Places
 import com.google.android.libraries.places.api.model.Place
 import com.google.android.libraries.places.widget.Autocomplete
@@ -27,6 +31,7 @@ import com.karumi.dexter.MultiplePermissionsReport
 import com.karumi.dexter.PermissionToken
 import com.karumi.dexter.listener.PermissionRequest
 import com.karumi.dexter.listener.multi.MultiplePermissionsListener
+import com.mprajadinata.happyplace.GetAddressFromLatLng
 import com.mprajadinata.happyplace.MainActivity
 import com.mprajadinata.happyplace.R
 import com.mprajadinata.happyplace.database.DatabaseHandler
@@ -43,6 +48,7 @@ class AddHappyPlaceActivity : AppCompatActivity(), View.OnClickListener {
 
 
     private lateinit var dateSetListener: DatePickerDialog.OnDateSetListener
+    private lateinit var mFusedLocationClient: FusedLocationProviderClient
     private var cal = Calendar.getInstance()
     private var saveImageToInternalStorage: Uri? = null
     private var mLatitude: Double = 0.0
@@ -70,6 +76,8 @@ class AddHappyPlaceActivity : AppCompatActivity(), View.OnClickListener {
             onBackPressed()
 
         }
+
+        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
         if (!Places.isInitialized()) {
             Places.initialize(this, resources.getString(R.string.google_maps_key))
@@ -152,13 +160,9 @@ class AddHappyPlaceActivity : AppCompatActivity(), View.OnClickListener {
 
                             override fun onPermissionsChecked(p0: MultiplePermissionsReport?) {
                                 if (p0!!.areAllPermissionsGranted()) {
-                                    Toast.makeText(
-                                        this@AddHappyPlaceActivity,
-                                        "Location permission is granted. Now you can request for a current location",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
+                                    requestNewLocationData()
 
+                                }
                             }
 
                             override fun onPermissionRationaleShouldBeShown(
@@ -237,6 +241,23 @@ class AddHappyPlaceActivity : AppCompatActivity(), View.OnClickListener {
                 }
             }
         }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun requestNewLocationData() {
+
+        val mLocationRequest = LocationRequest()
+        mLocationRequest.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+        mLocationRequest.interval = 0
+        mLocationRequest.fastestInterval = 0
+        mLocationRequest.numUpdates = 1
+
+        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        mFusedLocationClient.requestLocationUpdates(
+            mLocationRequest,
+            mLocationCallback,
+            Looper.myLooper()
+        )
     }
 
     private fun takePhotoFromCamera() {
@@ -384,5 +405,33 @@ class AddHappyPlaceActivity : AppCompatActivity(), View.OnClickListener {
         return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) || locationManager.isProviderEnabled(
             LocationManager.NETWORK_PROVIDER
         )
+    }
+
+    private val mLocationCallback = object : LocationCallback() {
+        override fun onLocationResult(p0: LocationResult) {
+            val mLastLocation: Location = p0.lastLocation
+            mLatitude = mLastLocation.latitude
+            Log.e("Current Latitude", "$mLatitude")
+            mLongitude = mLastLocation.longitude
+            Log.e("Current Longtitude", "$mLongitude")
+
+            val addressTask =
+                GetAddressFromLatLng(this@AddHappyPlaceActivity, mLatitude, mLongitude)
+
+            addressTask.setAddressListener(object : GetAddressFromLatLng.AddressListener {
+                override fun onAddressFound(address: String?) {
+                    Log.e("Address ::", "" + address)
+                    et_location.setText(address)
+                }
+
+                override fun onError() {
+                    Log.e("Get Address ::", "Something is wrong..")
+
+                }
+            })
+
+            addressTask.getAddress()
+
+        }
     }
 }
