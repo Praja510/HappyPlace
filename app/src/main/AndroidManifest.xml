@@ -34,7 +34,9 @@
 
         <activity
             android:name=".activity.MapsActivity"
-            android:label="@string/title_activity_maps"></activity>
+            android:label="@string/title_activity_maps"
+            android:theme="@style/CustomNoActionBarStyle" />
+
         <activity
             android:name=".activity.HappyDetailActivity"
             android:label="DETAIL HAPPY PLACE"

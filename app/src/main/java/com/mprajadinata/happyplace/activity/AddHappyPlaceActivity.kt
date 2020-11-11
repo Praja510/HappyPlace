@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.graphics.Bitmap
+import android.location.LocationManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
@@ -102,6 +103,7 @@ class AddHappyPlaceActivity : AppCompatActivity(), View.OnClickListener {
         tv_add_image.setOnClickListener(this)
         btn_save.setOnClickListener(this)
         et_location.setOnClickListener(this)
+        tv_select_current_location.setOnClickListener(this)
     }
 
     override fun onClick(v: View?) {
@@ -126,6 +128,47 @@ class AddHappyPlaceActivity : AppCompatActivity(), View.OnClickListener {
                     }
                 }
                 pictureDialog.show()
+            }
+
+            R.id.tv_select_current_location -> {
+                if (!isLocationEnabled()) {
+                    Toast.makeText(
+                        this,
+                        "Your location provider is turned off. Please turn it on",
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                    val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                    startActivity(intent)
+
+                } else {
+                    Dexter.withActivity(this)
+                        .withPermissions(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        )
+
+                        .withListener(object : MultiplePermissionsListener {
+
+                            override fun onPermissionsChecked(p0: MultiplePermissionsReport?) {
+                                if (p0!!.areAllPermissionsGranted()) {
+                                    Toast.makeText(
+                                        this@AddHappyPlaceActivity,
+                                        "Location permission is granted. Now you can request for a current location",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+
+                            }
+
+                            override fun onPermissionRationaleShouldBeShown(
+                                p0: MutableList<PermissionRequest>?,
+                                p1: PermissionToken?
+                            ) {
+                                showRationalDialogForPermission()
+                            }
+                        }).onSameThread().check()
+                }
             }
 
             R.id.et_location -> {
@@ -333,5 +376,13 @@ class AddHappyPlaceActivity : AppCompatActivity(), View.OnClickListener {
         }
 
         return Uri.parse(file.absolutePath)
+    }
+
+    private fun isLocationEnabled(): Boolean {
+        val locationManager: LocationManager =
+            getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) || locationManager.isProviderEnabled(
+            LocationManager.NETWORK_PROVIDER
+        )
     }
 }
